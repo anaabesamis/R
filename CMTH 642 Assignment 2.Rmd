@@ -1,0 +1,207 @@
+---
+title: 'CMTH 642 Data Analytics: Advanced Methods'
+output:
+  word_document: default
+  pdf_document: default
+  html_document: default
+---
+<center> <h1> Assignment 2 (10%) </h1> </center>
+<center> <h2> Ana Abesamis </h2> </center>
+<center> <h3> CMTH642 DHB ID# 501148675 </h3> </center>
+---
+
+## Import the following file:
+http://archive.ics.uci.edu/ml/machine-learning-databases/wine-quality/winequality-white.csv
+
+```{r}
+wine_quality <- read.csv(file="winequality-white.csv",header=TRUE, sep=";")
+head(wine_quality)
+
+```
+
+## 1. Check the data types of the attributes. (2 points)
+
+```{r}
+str(wine_quality)
+
+```
+
+## 2. Are there any missing values in the dataset? (2 points)
+
+```{r}
+sum(is.na(wine_quality))
+
+#There are no missing values in this dataset.
+
+```
+
+## 3. What is the correlation between the attributes other than Quality? (8 points)
+
+```{r}
+wqhead <- c("fixed.acidity","volatile.acidity","citric.acid","residual.sugar","chlorides",
+         "free.sulfur.dioxide","total.sulfur.dioxide","density","pH","sulphates",
+         "alcohol")
+wqsub <- wine_quality[,wqhead]
+head(wqsub)
+
+wqcortable <- cor(wqsub)
+wqcortable #shows table of values
+
+#install.packages("corrplot")
+library(corrplot)
+corrplot(wqcortable, method="color", type="lower") #shows visualization
+
+```
+
+## 4. Graph the frequency distribution of wine quality by using Quality. (8 points)
+
+```{r}
+hist(wine_quality$quality, freq=TRUE, main="Distribution of White Wine Quality",
+     col="beige", xlab="Score")
+
+```
+
+## 5. Reduce the levels of rating for quality to two levels, Pass and Fail. Assign the levels 3, 4, and 5 to level Fail; and 6, 7, 8, and 9 to level Pass. (10 points)
+
+```{r}
+
+# wine_quality$quality[wine_quality$quality==9] <- "Pass"
+# wine_quality$quality[wine_quality$quality==8] <- "Pass"
+# wine_quality$quality[wine_quality$quality==7] <- "Pass"
+# wine_quality$quality[wine_quality$quality==6] <- "Pass"
+# wine_quality$quality[wine_quality$quality==5] <- "Fail"
+# wine_quality$quality[wine_quality$quality==4] <- "Fail"
+# wine_quality$quality[wine_quality$quality==3] <- "Fail"
+
+#or
+
+for(i in 1:nrow(wine_quality)) {
+    if(wine_quality[i,12]<=5){
+      wine_quality[i,13]<- "Fail"
+      }
+    else if(wine_quality[i,12]>5){
+      wine_quality[i,13]<- "Pass"
+    }
+  }
+
+names(wine_quality)[names(wine_quality) == 'V13'] <- 'qualitest'
+
+head(wine_quality,10)
+
+```
+
+## 6. Normalize the numeric attributes. Hint: (x - min(x)) / (max(x) - min(x)) (10 points)
+
+```{r}
+normwine_quality <- data.frame(wine_quality)
+cols <- sapply(normwine_quality, is.numeric)
+normwine_quality[cols] <- scale(normwine_quality[cols])
+head(normwine_quality,10)
+
+```
+
+## 7. Prepare an exploratory data analysis question (without using predictions) about the dataset. Write a code to answer your question. Visualize your answer (i.e., use plots and graphs). (Your question should be related to at least three attributes in the dataset) (12 points)
+
+```{r}
+# EDA Question: Determine the three variables with strongest relationship with quality. Then visualize data
+# distribution of these variables, contrasting 'Pass' and 'Fail'
+
+wqhead2 <- c("fixed.acidity","volatile.acidity","citric.acid","residual.sugar","chlorides",
+             "free.sulfur.dioxide","total.sulfur.dioxide","density","pH","sulphates",
+             "alcohol","quality")
+wqsub2 <- wine_quality[,wqhead2]
+cor(wqsub2)
+
+# Based on correlation test values, the variables highly correlated with quality are
+# (1) alcohol
+# (2) density
+# (3) chlorides
+# Note that nominally, they are not strong correlations at all, but they are relatively, strongly correlated with quality.
+
+table(wine_quality$qualitest)
+
+# A simple test tells us that in the given dataset of 4898 observations, 1640 records
+# scored 'Fail' by 3258 records scored 'Pass'
+
+par(mfrow=c(1,3))
+boxplot(chlorides~qualitest, data=wine_quality, col="pink", border="red")
+boxplot(density~qualitest, data=wine_quality, col="pink", border="red")
+boxplot(alcohol~qualitest, data=wine_quality, col="lightblue", border="blue")
+
+# For the chloride level boxplot, majority of the data in Fail category are higher than in Pass category.
+# But unfortunately, the difference in medians are small and there are a lot of outliers for both categories so we
+# should expect unpredictability if we use chlorides for further analysis. Meanwhile the density boxplot shows a slightly # better contrast between the two categories. There are only minimal outliers which helps us imagine that it has a
+# more reliable spread of data for both categories. Lastly, alcohol level shows a clear difference in data
+# distribution between Fail and Pass. This is the most ideal boxplot of the three shown because we can tell right
+# away that there is some relationship between the two variables even before we test its correlation.
+
+```
+
+## 8. Divide the normalized dataset into training and test sets. (12 points)
+
+```{r}
+normwine_quality <- normwine_quality[-12] #removes numerical quality scores
+normwine_quality$qualitest[normwine_quality$qualitest=="Pass"] <- 1 #converts 'Pass' into 1
+normwine_quality$qualitest[normwine_quality$qualitest=="Fail"] <- 0 #converts 'Fail' into 0
+normwine_quality$qualitest <- as.numeric(normwine_quality$qualitest) #converts from char to num
+
+head(normwine_quality)
+
+set.seed(1)
+train_index <- sample(1:nrow(normwine_quality), 0.7 * nrow(normwine_quality))
+
+train_set <- normwine_quality[train_index,]
+test_set <- normwine_quality[-train_index,]
+
+head(train_set)
+head(test_set)
+
+```
+
+## 9. Use the Logistic Regression algorithm to predict the quality of wine using its attributes. (12 points)
+
+```{r}
+wq_model <- glm(qualitest~.,train_set, family = "binomial")
+summary(wq_model)
+
+# log(p/(1-p)) = 0.90849 - 0.04232*fixed.acidity - 0.74380*volatile.acidity + 0.02987*citric.acid
+#                 + 0.64986*residual.sugar - 0.03032*chlorides + 0.13776*free.sulfur.dioxide
+#                 - 0.01592*total.sulfur.dioxide - 0.43419*density + 0.14348*pH + 0.14720*sulphates
+#                 + 1.12155*alcohol
+
+```
+
+## 10. Display the confusion matrix to evaluate the model performance. (12 points)
+
+```{r}
+predicted <- predict(wq_model, test_set, type="response")
+predicted_qualitest <- ifelse(predicted>=0.5, 1, 0)
+cm_winequality <- table(actual = test_set$qualitest,predicted = predicted_qualitest)
+cm_winequality
+
+```
+
+## 11. Evaluate the model performance by computing Accuracy, Sensitivity, and Specificity. (12 points)
+```{r}
+# Confusion Matrix:
+#        Predicted
+# actual TN | FP
+#        -------
+#        FN | TP
+
+# Accuracy = TP + TN / all values
+# Sensitivity = TP / (TP + FN)
+# Specificity = TN / (TN + FP)
+
+addmargins(cm_winequality) #for reference
+
+accuracy_wq <- sum(diag(cm_winequality))/nrow(test_set) #0.7387755
+accuracy_wq
+sensitivity_wq <- cm_winequality[2,2]/sum(cm_winequality[2,]) #0.8643371
+sensitivity_wq
+specificity_wq <- cm_winequality[1,1]/sum(cm_winequality[1,]) #0.4929577
+specificity_wq
+
+
+```
+
